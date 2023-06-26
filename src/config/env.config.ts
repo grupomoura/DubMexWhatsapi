@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { load } from 'js-yaml';
 import { join } from 'path';
 import { SRC_DIR } from './path.config';
+import { isBooleanString } from 'class-validator';
 
 export type HttpServer = { TYPE: 'http' | 'https'; PORT: number };
 
@@ -47,6 +48,7 @@ export type Database = {
 export type Redis = {
   ENABLED: boolean;
   URI: string;
+  PREFIX_KEY: string;
 };
 
 export type EventsWebhook = {
@@ -117,7 +119,7 @@ export class ConfigService {
     this.env.PRODUCTION = process.env?.NODE_ENV === 'PROD';
     if (process.env?.DOCKER_ENV === 'true') {
       this.env.SERVER.TYPE = 'http';
-      this.env.SERVER.PORT = Number.parseInt(process.env?.SERVER_PORT ?? '8080');
+      this.env.SERVER.PORT = 8083;
     }
   }
 
@@ -166,15 +168,15 @@ export class ConfigService {
       REDIS: {
         ENABLED: process.env?.REDIS_ENABLED === 'true',
         URI: process.env.REDIS_URI,
+        PREFIX_KEY: process.env.REDIS_PREFIX_KEY,
       },
       LOG: {
         LEVEL: process.env?.LOG_LEVEL.split(',') as LogLevel[],
         COLOR: process.env?.LOG_COLOR === 'true',
       },
-      DEL_INSTANCE:
-        typeof process.env?.DEL_INSTANCE === 'boolean'
-          ? process.env.DEL_INSTANCE === 'true'
-          : Number.parseInt(process.env.DEL_INSTANCE),
+      DEL_INSTANCE: isBooleanString(process.env?.DEL_INSTANCE)
+        ? process.env.DEL_INSTANCE === 'true'
+        : Number.parseInt(process.env.DEL_INSTANCE),
       WEBHOOK: {
         GLOBAL: {
           URL: process.env?.WEBHOOK_GLOBAL_URL,

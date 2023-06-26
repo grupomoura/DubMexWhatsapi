@@ -7,9 +7,9 @@ networks:
 services:
   base:
     container_name: codechat_api
-    image: codechat/api:latest
+    image: codechat/api:local
     ports:
-      - 8084:8084
+      - 8083:8083
     volumes:
       - /data/instances:/codechat/instances
     command: ['node', './dist/src/main.js']
