@@ -1,8 +1,8 @@
-FROM node:16.19.0
+FROM node:18
 
 LABEL version="1.2.0" description="Api to control whatsapp features through http requests." 
 LABEL maintainer="Cleber Wilson" git="https://github.com/jrCleber"
-LABEL contact="contato@codechat.dev"
+LABEL contact="contato@codechat.dev" whatsapp="https://chat.whatsapp.com/HyO8X8K0bAo0bfaeW8bhY5" telegram="https://t.me/codechatBR"
 
 RUN apt-get update -y
 RUN apt-get upgrade -y
@@ -42,7 +42,8 @@ ENV DATABASE_SAVE_DATA_CONTACTS=true
 ENV DATABASE_SAVE_DATA_CHATS=true
 
 ENV REDIS_ENABLED=false
-ENV REDIS_URI='redis://<HOST>'
+ENV REDIS_URI='redis://<HOST>/1'
+ENV REDIS_PREFIX_KEY='codechat'
 
 ENV WEBHOOK_GLOBAL_URL='<url>'
 ENV WEBHOOK_GLOBAL_ENABLED=false
@@ -76,7 +77,7 @@ ENV AUTHENTICATION_TYPE='jwt'
 
 ENV AUTHENTICATION_API_KEY='t8OOEeISKzpmc3jjcMqBWYSaJsafdefer'
 
-ENV AUTHENTICATION_JWT_EXPIRIN_IN=0
+ENV AUTHENTICATION_JWT_EXPIRIN_IN=3600
 ENV AUTHENTICATION_JWT_SECRET='L0YWtjb2w554WFqPG'
 
 RUN npm install
@@ -84,4 +85,3 @@ RUN npm install
 COPY . .
 
 CMD [ "node", "./dist/src/main.js" ]
-

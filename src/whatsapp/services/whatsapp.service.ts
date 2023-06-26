@@ -15,6 +15,7 @@ import makeWASocket, {
   GroupMetadata,
   isJidGroup,
   isJidUser,
+  makeCacheableSignalKeyStore,
   MessageUpsertType,
   ParticipantAction,
   prepareWAMessageMedia,
@@ -25,12 +26,11 @@ import makeWASocket, {
   WAMediaUpload,
   WAMessageUpdate,
   WASocket,
-} from '@codechat/base';
+} from '@whiskeysockets/baileys';
 import {
   ConfigService,
   ConfigSessionPhone,
   Database,
-  Env,
   QrCode,
   Redis,
   StoreConf,
@@ -330,7 +330,9 @@ export class WAStartupService {
           instance: this.instance.name,
           status: 'removed',
         });
-        return this.eventEmitter.emit('remove.instance', this.instance.name, 'inner');
+        this.eventEmitter.emit('remove.instance', this.instance.name, 'inner');
+        this.client?.ws?.close();
+        this.client.end(new Error('Close connection'));
       }
     }
 
@@ -389,7 +391,7 @@ export class WAStartupService {
     const redis = this.configService.get<Redis>('REDIS');
 
     if (redis?.ENABLED) {
-      return await useMultiFileAuthStateRedisDb(redis.URI, this.instance.name);
+      return await useMultiFileAuthStateRedisDb(redis, this.instance.name);
     }
 
     if (db.SAVE_DATA.INSTANCE && db.ENABLED) {
@@ -410,7 +412,13 @@ export class WAStartupService {
       const browser: WABrowserDescription = [session.CLIENT, session.NAME, release()];
 
       const socketConfig: UserFacingSocketConfig = {
-        auth: this.instance.authState.state,
+        auth: {
+          creds: this.instance.authState.state.creds,
+          keys: makeCacheableSignalKeyStore(
+            this.instance.authState.state.keys,
+            P({ level: 'error' }),
+          ),
+        },
         logger: P({ level: 'error' }),
         printQRInTerminal: false,
         browser,
@@ -766,13 +774,21 @@ export class WAStartupService {
     });
   }
 
-  private createJid(number: string) {
-    if (number.includes('@g.us') || number.includes('@s.whatsapp.net')) {
-      return number;
+  // Check if the number is MX or AR
+  private formatMXOrARNumber(jid: string): string {
+    const regexp = new RegExp(/^(\d{2})(\d{2})\d{1}(\d{8})$/);
+    if (regexp.test(jid)) {
+      const match = regexp.exec(jid);
+      if (match && (match[1] === '52' || match[1] === '54')) {
+        const joker = Number.parseInt(match[3][0]);
+        const ddd = Number.parseInt(match[2]);
+        if (joker < 7 || ddd < 11) {
+          return match[0];
+        }
+        return match[1] === '52' ? '52' + match[3] : '54' + match[3];
+      }
     }
-    return number.includes('-')
-      ? `${number}@g.us`
-      : `${this.formatBRNumber(number)}@s.whatsapp.net`;
+    return jid;
   }
 
   // Check if the number is br
@@ -791,6 +807,28 @@ export class WAStartupService {
     } else {
       return jid;
     }
+  }
+
+  private createJid(number: string): string {
+    if (number.includes('@g.us') || number.includes('@s.whatsapp.net')) {
+      return number;
+    }
+
+    const formattedBRNumber = this.formatBRNumber(number);
+    if (formattedBRNumber !== number) {
+      return `${formattedBRNumber}@s.whatsapp.net`;
+    }
+
+    const formattedMXARNumber = this.formatMXOrARNumber(number);
+    if (formattedMXARNumber !== number) {
+      return `${formattedMXARNumber}@s.whatsapp.net`;
+    }
+
+    if (number.includes('-')) {
+      return `${number}@g.us`;
+    }
+
+    return `${number}@s.whatsapp.net`;
   }
 
   public async profilePicture(number: string) {
